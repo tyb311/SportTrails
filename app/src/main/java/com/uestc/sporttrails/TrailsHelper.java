@@ -50,6 +50,7 @@ import okhttp3.ResponseBody;
 public class TrailsHelper {
     public static String current_RideId="";
     public static int current_distance=0;
+    public boolean flag_running=false;
 //    # trkpt/km: 222.43845252051582
 
     public static String gpx_name="sports_trail.gpx";
@@ -261,7 +262,8 @@ public class TrailsHelper {
         return Base64.encodeToString(encryptedBytes, Base64.DEFAULT);
     }
 
-    public boolean download_latest_gpxfile(String idStr){
+    public boolean download_gpxfile_byid(String idStr){
+        flag_running=true;
         Gson gson = new Gson();
         // 将 JSON 字符串转换为 JsonObject
         JsonObject jsonObject = gson.fromJson(str_rtn, JsonObject.class);
@@ -269,7 +271,11 @@ public class TrailsHelper {
         JsonObject element = null;
         for(int i=0;i< jsonArray.size();i++){
             element = jsonArray.get(i).getAsJsonObject();
-            if(element.get("id").getAsString()==idStr)break;
+//            Message msg = handler.obtainMessage();
+//            msg.obj = "check-id:"+element.get("id").getAsString()+"-"+idStr;
+//            handler.sendMessage(msg);
+            if(element.get("id").getAsString().contains(idStr))
+                break;  //==并不行，用contains才可以
         }
         System.out.println("Downloading:"+element.toString());
         String RideId = element.get("id").getAsString();
@@ -285,10 +291,9 @@ public class TrailsHelper {
         }
         if(outputFile.exists()){
             Message msg = handler.obtainMessage();
-            msg.obj = "文件覆盖保存:"+outputFile.getName();
+            msg.obj = "文件覆盖保存:"+outputFile.getName()+"@"+current_RideId;
             handler.sendMessage(msg);
             outputFile.delete();
-//                            return;
         }
 
 //                        https://www.imxingzhe.com/api/v1/pgworkout/185790375/gpx/
@@ -308,6 +313,7 @@ public class TrailsHelper {
             try {
                 writeFile(outputFile, fileResponse.body().bytes());
                 System.out.println("文件写入成功: " + outputFile);
+                flag_running=false;
                 return true;
             } catch (IOException e) {
                 e.printStackTrace();
@@ -318,8 +324,67 @@ public class TrailsHelper {
         }
 //                I/System.out: 下载到: /storage/emulated/0/Download/SportsTrails/185387836.gpx
 //                I/System.out: 文件保存成功: /storage/emulated/0/Download/SportsTrails/185387836.gpx
+        flag_running=false;
         return false;
     }
+//
+//    public boolean download_latest_gpxfile(){
+//        flag_running=true;
+//        Gson gson = new Gson();
+//        // 将 JSON 字符串转换为 JsonObject
+//        JsonObject jsonObject = gson.fromJson(str_rtn, JsonObject.class);
+//        JsonArray jsonArray = jsonObject.getAsJsonObject("data").getAsJsonArray("data");
+//        JsonObject element = jsonArray.get(0).getAsJsonObject();
+//
+//        System.out.println("Downloading:"+element.toString());
+//        String RideId = element.get("id").getAsString();
+//        String uuid = element.get("uuid").getAsString();
+//        current_RideId = RideId;
+//        current_distance = (int) element.get("distance").getAsDouble();
+//        // 使用 File 构造文件路径（避免字符串拼接错误）
+//        File outputFile = null;
+//        try {
+//            outputFile = new File(getAppPath(), gpx_name);
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//        if(outputFile.exists()){
+//            Message msg = handler.obtainMessage();
+//            msg.obj = "文件覆盖保存:"+outputFile.getName();
+//            handler.sendMessage(msg);
+//            outputFile.delete();
+//        }
+//
+////                        https://www.imxingzhe.com/api/v1/pgworkout/185790375/gpx/
+//        String fileUrl = "https://www.imxingzhe.com/api/v1/pgworkout/" + RideId + "/gpx/";
+//        System.out.println("downloading: " + fileUrl);
+//        Request fileRequest = new Request.Builder()
+//                .url(fileUrl)
+//                .build();
+//        Response fileResponse = null;
+//        try {
+//            fileResponse = client.newCall(fileRequest).execute();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//        if (fileResponse.code() == 200) {
+//            System.out.println("下载到: " + outputFile);
+//            try {
+//                writeFile(outputFile, fileResponse.body().bytes());
+//                System.out.println("文件写入成功: " + outputFile);
+//                return true;
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//                System.out.println("文件写入失败: " + outputFile);
+//            }
+//        } else {
+//            System.out.println("文件请求失败: " + fileResponse.code() + outputFile);
+//        }
+////                I/System.out: 下载到: /storage/emulated/0/Download/SportsTrails/185387836.gpx
+////                I/System.out: 文件保存成功: /storage/emulated/0/Download/SportsTrails/185387836.gpx
+//        flag_running=false;
+//        return false;
+//    }
 
     String str_rtn=null;
     public String loginXOSS() throws Exception {
@@ -513,12 +578,13 @@ public class TrailsHelper {
 
     // Main upload flow
     public void uploadGPXFiles() {
+        flag_running=true;
         try {
             File gpxFile = new File(getAppPath(), current_RideId + ".gpx");
 //            File gpxFile = new File(getAppPath(), gpx_name);
             if(! gpxFile.exists()){
                 Message msg = handler.obtainMessage();
-                msg.obj = "GPX文件还未生成成功";
+                msg.obj = "GPX文件还未生成成功:"+gpxFile.getName();
                 handler.sendMessage(msg);
             }
             // 1. Login to iGPSport
@@ -526,13 +592,15 @@ public class TrailsHelper {
             Log.i("OSS", "登录至IGPS成功");
 
             // 2. Process files
-//            File gpxDir = getAppPath();
+            File gpxDir = getAppPath();
 //            Log.i("OSS", gpxDir.getAbsolutePath());
 
-//            File[] gpxFiles = gpxDir.listFiles();
-//            Log.i("OSS", "Files="+gpxFiles.length);
-
-//            for (File gpxFile : gpxDir.listFiles()) {
+            File[] gpxFiles = gpxDir.listFiles();
+            Log.i("OSS", "Files="+gpxFiles.length);
+            String folderTree=gpxDir.getAbsolutePath();
+            for (File gpx : gpxDir.listFiles()) {
+                folderTree += "\n\t"+gpx.getName();
+            }
 
             String ossName = "1456042-" + UUID.randomUUID().toString();
             Log.i("OSS", gpxFile.getName());
@@ -540,9 +608,9 @@ public class TrailsHelper {
 
             // 3. Upload to OSS
             upload2oss(token_igp, gpxFile, ossName);
-            Log.i("OSS", "上传至OSS成功");
+            Log.i("OSS", "上传至OSS成功:"+gpxFile.getName());
             Message msg = handler.obtainMessage();
-            msg.obj = "上传至OSS成功！";
+            msg.obj = "上传至OSS成功:"+gpxFile.getName();
             handler.sendMessage(msg);
 
             // 4. Notify server
@@ -550,10 +618,10 @@ public class TrailsHelper {
             Log.i("OSS", "上传至IGPS成功");
 
             msg = handler.obtainMessage();
-            msg.obj = "上传至IGPSPORTS成功！";
+            msg.obj = "上传至IGPSPORTS成功:"+gpxFile.getName()+"\n"+folderTree;
             handler.sendMessage(msg);
 //                /data/user/0/com.uestc.sporttrails/files/SportsTrails/185387836.gpx
-//            break;
+            flag_running=false;
 //          }
         } catch (Exception e) {
             Log.i("OSS", "上传至OSS失败");
@@ -562,6 +630,7 @@ public class TrailsHelper {
             msg.obj = "上传至IGPSPORTS失败！";
             handler.sendMessage(msg);
             e.printStackTrace();
+            flag_running=false;
         }
     }
 

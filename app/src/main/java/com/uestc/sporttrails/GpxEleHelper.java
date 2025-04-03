@@ -35,6 +35,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 public class GpxEleHelper {
+    public boolean flag_running=false;
     public static int fetch_stride = 50;
     private static final String TAG = "GpxElevationProcessor";
 
@@ -51,6 +52,7 @@ public class GpxEleHelper {
         @Override
         protected String doInBackground(File... files) {
             File gpxFile = files[0];
+            flag_running=true;
             try {
                 long startTime = System.currentTimeMillis(); // 获取开始时间
 
@@ -71,15 +73,17 @@ public class GpxEleHelper {
                 Log.d("RunTime", "程序运行时间：" + elapsedTime + " 秒");
 
                 Message msg = handler.obtainMessage();
-                msg.obj = "为GPX添加ELE成功@耗时"+elapsedTime+"秒";
+                msg.obj = "添加ELE成功@耗时"+elapsedTime+"秒@"+gpxFile.getName();
                 handler.sendMessage(msg);
 
+                flag_running=false;
                 return "GPX file processed successfully!";
             } catch (Exception e) {
                 Log.e(TAG, "Error processing GPX file", e);
                 Message msg = handler.obtainMessage();
                 msg.obj = "为GPX添加ELE失败";
                 handler.sendMessage(msg);
+                flag_running=false;
                 return "Error: " + e.getMessage();
             }
         }
