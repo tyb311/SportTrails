@@ -48,10 +48,16 @@ import okhttp3.Response;
 import okhttp3.ResponseBody;
 
 public class TrailsHelper {
-    private static String token_xoss="", token_igp="", file_name="sports_trail";
+    public static String current_RideId="";
+    public static int current_distance=0;
+//    # trkpt/km: 222.43845252051582
+
+    public static String gpx_name="sports_trail.gpx";
+    private static String token_xoss="";
+    private static String token_igp="";
     private static OkHttpClient client;
     private Context context;
-    private Handler handler;
+    public static Handler handler;
     UtilPreferences preferences;
     public TrailsHelper(Context context, Handler handler) {
         this.context = context;
@@ -67,7 +73,7 @@ public class TrailsHelper {
         igps_password = (String) preferences.getParam("igps_password", "");
     }
 
-    public File getAppPath() throws IOException {
+    public static File getAppPath() throws IOException {
 //        File gpxDir = new File(context.getFilesDir(), "SportsTrails");// 获取应用内部存储的 files 目录
         // 获取公共下载目录
         File publicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -79,20 +85,21 @@ public class TrailsHelper {
         }
 
         if (!gpxDir.exists() || !gpxDir.isDirectory()) {
-            Log.e("OSS", "目录不存在或不是有效目录");
-            Message msg = handler.obtainMessage();
-            msg = handler.obtainMessage();
-            msg.obj = "目录不存在或不是有效目录！";
-            handler.sendMessage(msg);
+//            Log.e("OSS", "目录不存在或不是有效目录");
+//            Message msg = handler.obtainMessage();
+//            msg = handler.obtainMessage();
+//            msg.obj = "目录不存在或不是有效目录！";
+//            handler.sendMessage(msg);
         }else{
-            Log.e("OSS", "目录存在或是有效目录");
-            Message msg = handler.obtainMessage();
-            msg = handler.obtainMessage();
-            msg.obj = "目录存在或是有效目录！";
-            handler.sendMessage(msg);
+//            Log.e("OSS", "目录存在或是有效目录");
+//            Message msg = handler.obtainMessage();
+//            msg = handler.obtainMessage();
+//            msg.obj = "目录存在或是有效目录！";
+//            handler.sendMessage(msg);
         }
         return gpxDir;
     }
+
     static {
         // 创建 OkHttpClient 实例，使用 CookieJar 管理会话状态
         client = new OkHttpClient.Builder()
@@ -210,7 +217,7 @@ public class TrailsHelper {
         }
 
 //        String query_url = "https://my.igpsport.com/Activity/ActivityList";
-        String query_url = "https://prod.zh.igpsport.com/service/web-gateway/web-analyze/activity/queryMyActivity?pageNo=1&pageSize=1000&reqType=0&sort=1";
+        String query_url = "https://prod.zh.igpsport.com/service/web-gateway/web-analyze/activity/queryMyActivity?pageNo=1&pageSize=20&reqType=0&sort=1";
         request = new Request.Builder()
                 .url(query_url)
                 .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -229,7 +236,6 @@ public class TrailsHelper {
 //                MediaType JSON = MediaType.get("application/json; charset=utf-8");
 //                RequestBody requestBody = RequestBody.create(response.body(), JSON);
                 return response.body().string();
-
             }
             return null;
         }
@@ -253,6 +259,66 @@ public class TrailsHelper {
         cipher.init(Cipher.ENCRYPT_MODE, publicKey);
         byte[] encryptedBytes = cipher.doFinal(password.getBytes());
         return Base64.encodeToString(encryptedBytes, Base64.DEFAULT);
+    }
+
+    public boolean download_latest_gpxfile(String idStr){
+        Gson gson = new Gson();
+        // 将 JSON 字符串转换为 JsonObject
+        JsonObject jsonObject = gson.fromJson(str_rtn, JsonObject.class);
+        JsonArray jsonArray = jsonObject.getAsJsonObject("data").getAsJsonArray("data");
+        JsonObject element = null;
+        for(int i=0;i< jsonArray.size();i++){
+            element = jsonArray.get(i).getAsJsonObject();
+            if(element.get("id").getAsString()==idStr)break;
+        }
+        System.out.println("Downloading:"+element.toString());
+        String RideId = element.get("id").getAsString();
+        String uuid = element.get("uuid").getAsString();
+        current_RideId = RideId;
+        current_distance = (int) element.get("distance").getAsDouble();
+        // 使用 File 构造文件路径（避免字符串拼接错误）
+        File outputFile = null;
+        try {
+            outputFile = new File(getAppPath(), gpx_name);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if(outputFile.exists()){
+            Message msg = handler.obtainMessage();
+            msg.obj = "文件覆盖保存:"+outputFile.getName();
+            handler.sendMessage(msg);
+            outputFile.delete();
+//                            return;
+        }
+
+//                        https://www.imxingzhe.com/api/v1/pgworkout/185790375/gpx/
+        String fileUrl = "https://www.imxingzhe.com/api/v1/pgworkout/" + RideId + "/gpx/";
+        System.out.println("downloading: " + fileUrl);
+        Request fileRequest = new Request.Builder()
+                .url(fileUrl)
+                .build();
+        Response fileResponse = null;
+        try {
+            fileResponse = client.newCall(fileRequest).execute();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if (fileResponse.code() == 200) {
+            System.out.println("下载到: " + outputFile);
+            try {
+                writeFile(outputFile, fileResponse.body().bytes());
+                System.out.println("文件写入成功: " + outputFile);
+                return true;
+            } catch (IOException e) {
+                e.printStackTrace();
+                System.out.println("文件写入失败: " + outputFile);
+            }
+        } else {
+            System.out.println("文件请求失败: " + fileResponse.code() + outputFile);
+        }
+//                I/System.out: 下载到: /storage/emulated/0/Download/SportsTrails/185387836.gpx
+//                I/System.out: 文件保存成功: /storage/emulated/0/Download/SportsTrails/185387836.gpx
+        return false;
     }
 
     String str_rtn=null;
@@ -292,79 +358,24 @@ public class TrailsHelper {
         }
 
         request = new Request.Builder()
-                .url("https://www.imxingzhe.com/api/v1/pgworkout/?offset=0&limit=1000&sport=3&year=&month=")
+                .url("https://www.imxingzhe.com/api/v1/pgworkout/?offset=0&limit=20&sport=3&year=&month=")
                 .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 .addHeader("Referer", "https://www.imxingzhe.com/")
                 .build();
-        Log.i("XOSS-GET", request.toString());
+//        Log.i("XOSS-GET", request.toString());
         str_rtn=null;
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful() && response.body() != null) {
-                Log.i("XOSS", response.toString());
-                Log.i("XOSS-body", response.body().toString());
-                Log.i("XOSS-msg", response.message());
-                Log.i("XOSS-code", String.valueOf(response.code()));
+//                Log.i("XOSS", response.toString());
+//                Log.i("XOSS-body", response.body().toString());
+//                Log.i("XOSS-msg", response.message());
+//                Log.i("XOSS-code", String.valueOf(response.code()));
                 str_rtn = response.body().string();
 //                Log.i("XOSS", str_rtn);
 
 //                MediaType JSON = MediaType.get("application/json; charset=utf-8");
 //                RequestBody requestBody = RequestBody.create(response.body(), JSON);
 
-//                public void downloadGpxFromXoss
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-
-                        Gson gson = new Gson();
-                        // 将 JSON 字符串转换为 JsonObject
-                        JsonObject jsonObject = gson.fromJson(str_rtn, JsonObject.class);
-                        JsonArray jsonArray = jsonObject.getAsJsonObject("data").getAsJsonArray("data");
-                        JsonObject element = jsonArray.get(0).getAsJsonObject();
-                        System.out.println("Downloading:"+element.toString());
-                        String RideId = element.get("id").getAsString();
-                        String uuid = element.get("uuid").getAsString();
-
-                        // 使用 File 构造文件路径（避免字符串拼接错误）
-                        File outputFile = null;
-                        try {
-                            outputFile = new File(getAppPath(), file_name + ".gpx");
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                        if(outputFile.exists()){
-                            Message msg = handler.obtainMessage();
-                            msg.obj = "文件已存在:"+outputFile.getName();
-                            handler.sendMessage(msg);
-                            return;
-                        }
-
-//                        https://www.imxingzhe.com/api/v1/pgworkout/185790375/gpx/
-                        String fileUrl = "https://www.imxingzhe.com/api/v1/pgworkout/" + RideId + "/gpx/";
-                        System.out.println("downloading: " + fileUrl);
-                        Request fileRequest = new Request.Builder()
-                                .url(fileUrl)
-                                .build();
-                        Response fileResponse = null;
-                        try {
-                            fileResponse = client.newCall(fileRequest).execute();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                        if (fileResponse.code() == 200) {
-                            System.out.println("下载到: " + outputFile);
-                            try {
-                                writeFile(outputFile, fileResponse.body().bytes());
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                            System.out.println("文件保存成功: " + outputFile);
-                        } else {
-                            System.out.println("请求失败，状态码: " + fileResponse.code());
-                        }
-//                I/System.out: 下载到: /storage/emulated/0/Download/SportsTrails/185387836.gpx
-//                I/System.out: 文件保存成功: /storage/emulated/0/Download/SportsTrails/185387836.gpx
-                    }
-                }).start();
             }
             return str_rtn;
         }
@@ -403,7 +414,7 @@ public class TrailsHelper {
                 .url(url)
                 .addHeader("Authorization", "Bearer " + loginToken)
                 .build();
-        Log.i("STS", request.toString());
+//        Log.i("STS", request.toString());
         try (Response response = client.newCall(request).execute()) {
             Log.i("STS", response.toString());
             if (response.isSuccessful() && response.body() != null) {
@@ -503,20 +514,26 @@ public class TrailsHelper {
     // Main upload flow
     public void uploadGPXFiles() {
         try {
+            File gpxFile = new File(getAppPath(), current_RideId + ".gpx");
+//            File gpxFile = new File(getAppPath(), gpx_name);
+            if(! gpxFile.exists()){
+                Message msg = handler.obtainMessage();
+                msg.obj = "GPX文件还未生成成功";
+                handler.sendMessage(msg);
+            }
             // 1. Login to iGPSport
             loginIGPS();
             Log.i("OSS", "登录至IGPS成功");
 
             // 2. Process files
-            File gpxDir = getAppPath();
-            Log.i("OSS", gpxDir.getAbsolutePath());
+//            File gpxDir = getAppPath();
+//            Log.i("OSS", gpxDir.getAbsolutePath());
 
-            File[] gpxFiles = gpxDir.listFiles();
-            Log.i("OSS", "Files="+gpxFiles.length);
+//            File[] gpxFiles = gpxDir.listFiles();
+//            Log.i("OSS", "Files="+gpxFiles.length);
 
 //            for (File gpxFile : gpxDir.listFiles()) {
 
-            File gpxFile = new File(getAppPath(), file_name + ".gpx");
             String ossName = "1456042-" + UUID.randomUUID().toString();
             Log.i("OSS", gpxFile.getName());
             Log.i("OSS", ossName);

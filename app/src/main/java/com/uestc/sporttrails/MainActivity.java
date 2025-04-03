@@ -13,36 +13,45 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 
+import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener{
     Button btn_xoss,btn_upload,btn_igps;
     TextView textView;
     ListView listView;
     TrailsHelper trailsHelper;
+    GpxEleHelper gpxEleHelper;
 
     // 检查网络是否可用
     private boolean isNetworkAvailable() {
@@ -51,6 +60,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         @SuppressLint("MissingPermission") NetworkInfo activeNetwork = manager.getActiveNetworkInfo();
         return activeNetwork != null && activeNetwork.isConnected();
+    }
+    private void log2textview(String text) {
+        // 追加新内容
+        if(text.startsWith("\r")){
+            textView.append(text);
+        }else
+            textView.append("\n"+text);
+        // 滚动 ScrollView 到底部
+        scroll_textView.post(() -> scroll_textView.fullScroll(View.FOCUS_DOWN));
+    }
+    private void log2handler(String log){
+        Message msg = handler.obtainMessage();
+        msg.obj = log;
+        handler.sendMessage(msg);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -75,6 +98,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @RequiresApi(api = Build.VERSION_CODES.O)
     private void jsonStr2ListView(String jsonData){
 //        String jsonData = response.body().string();
+//        log2handler(jsonData);
         Gson gson = new Gson();
         // 将 JSON 字符串转换为 JsonObject
         JsonObject jsonObject = gson.fromJson(jsonData, JsonObject.class);
@@ -95,19 +119,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         dataList.clear();
         if(jsonObject.has("rows")){
-//                {"total":68,"item":[
-//                  {"RideId":27326716,"MemberId":1456042,"MemberName":"成都街溜子",
-//                  "MemberImg":"https://igp-zh.oss-cn-hangzhou.aliyuncs.com/1456042-356be54d-b21d-42c1-8323-5e92927b2fff",
-//                  "Title":"185387836",
-//                  "StartTime":"2025-03-25 03:25:03",
-//                  "ThumbPath":"https://igp-zh.oss-cn-hangzhou.aliyuncs.com/9e4a4cca-073c-4caa-87e6-b1b4fc58471a.png",
-//                  "RideDistance":"23.13","TotalAscent":"0","RecordTime":"1时39分","Praise":0,"IsMy":1,"RideTag":"","Metric":0},
-
-//            {"code":0,"message":"success","data":{"pageNo":1,"pageSize":20,"totalPage":4,"totalRows":68,"rows":[
-//                    {"id":"67e7d33798fb1b31c74b11bc","rideId":27357885,"exerciseType":0,
-//                            "title":"185719628","startTime":"2025.03.25","rideDistance":23132.87,"totalMovingTime":5990.0,
-//                            "avgSpeed":3.816,"dataStatus":1,"analysisStatus":1,
-//                            "fitOssPath":"https://igp-zh.oss-cn-hangzhou.aliyuncs.com/b426909c-423d-4eae-aa4f-c8cb5e920e34.fit","label":1,"isOpen":0,"unRead":true},
             JsonArray jsonArray = jsonObject.getAsJsonArray("rows");
             for (int i = 0; i < jsonArray.size(); i++) {
                 JsonObject element = jsonArray.get(i).getAsJsonObject();
@@ -119,16 +130,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 String StartTime = element.get("startTime").getAsString();
                 double RideDistance = element.get("rideDistance").getAsDouble();
                 String RecordTime = element.get("totalMovingTime").getAsString();
-                dataList.add("IGPS"+"[ID="+RideId+"]@"+StartTime);
-                textView.setText("IGPSORTS@"+jsonArray.size());
-            }
-        }else if(jsonObject.has("data")){
-//        {"code":0,"data":{"data":[
-//        {"id":185387836,"uuid":"943cd422-8815-414e-9d5c-eca8813a526b","sport":3,
-//        "title":"2025-03-24 晚上 骑行","duration":5909,"distance":22559.0,"elevation_gain":77.0,"start_time":1742815464000,
-//        "thumbnail":"https://static.imxingzhe.com/workout/943cd422-8815-414e-9d5c-eca8813a526b.png!workoutThumb",
-//        "tss":0.0,"loc_source":1,"has_cadence":false,"has_heartrate":false,"has_power":false,"credits":23511,"avg_speed":13.716,"hidden":0},
 
+//                Map<String, Object> map = new HashMap<>();
+//                map.put("platform", "IGPS");
+//                map.put("id", RideId);
+//                map.put("time", StartTime);
+//                dataList.add(gson.toJson(map));
+                dataList.add("iGPS"+"#"+RideId+"@"+StartTime);
+            }
+            log2textview("IGPSORTS@最新轨迹数量："+jsonArray.size());
+        }else if(jsonObject.has("data")){
             JsonArray jsonArray = jsonObject.getAsJsonArray("data");
             for (int i = 0; i < jsonArray.size(); i++) {
                 JsonObject element = jsonArray.get(i).getAsJsonObject();
@@ -139,9 +150,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 long StartTime = element.get("start_time").getAsLong();
                 double RideDistance = element.get("distance").getAsDouble();
                 String RecordTime = element.get("duration").getAsString();
-                dataList.add("XOSS"+"[ID="+RideId+"]@"+long2time(StartTime));
-                textView.setText("XOSS@"+jsonArray.size());
+                dataList.add("XOSS"+"#"+RideId+"@"+long2time(StartTime));
+//                Map<String, Object> map = new HashMap<>();
+//                map.put("platform", "IGPS");
+//                map.put("id", RideId);
+//                map.put("time", StartTime);
+//                dataList.add(gson.toJson(map));
             }
+            log2textview("XOSS@最新轨迹数量："+jsonArray.size());
         }
         adapter.notifyDataSetChanged();
     }
@@ -158,7 +174,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 ////            toast.setText(msg.obj.toString());
 ////            toast.show();
 //            Toast.makeText(getApplicationContext(), msg.obj.toString(), LENGTH_SHORT).show();
-            
+
             flag_btn = msg.obj.toString();
 
             if (flag_btn=="refresh_ui"){
@@ -171,31 +187,51 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 public void run() {
                     if(flag_btn=="login_xoss"){
                         try {
+                            log2handler("正在登录XOSS...");
                             ui_string = trailsHelper.loginXOSS();
+
+                            // downloadGpxFromXoss
+                            new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    log2handler("正在下载最新GPX...");
+                                    boolean flag_download = trailsHelper.download_latest_gpxfile();
+//                                    log2handler("下载最新GPX完成！");
+                                    File gpxFile = null;
+                                    try {
+                                        gpxFile = new File(trailsHelper.getAppPath(), trailsHelper.gpx_name);
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                    if(flag_download && gpxFile.exists()){
+                                        Log.i("ELE", gpxFile.getAbsolutePath());
+                                        log2handler("正在生成海拔数据...");
+                                        gpxEleHelper.processGpxFile(gpxFile);
+                                    }
+                                }
+                            }).start();
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
-//                        // 创建 Intent
-//                        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-//                        intent.setType("*/*");
-//                        intent.addCategory(Intent.CATEGORY_OPENABLE);
-//                        try {
-//                            intent.putExtra("android.content.extra.FOLDER_NAME", trailsHelper.getAppPath()); // 部分设备支持
-//                            startActivity(Intent.createChooser(intent, "选择文件管理器"));
-//                        } catch (IOException e) {
-//                            e.printStackTrace();
-//                            Log.e("Main", "未找到文件管理器应用");
-//                        }
 
-
+                        // 打开文件所在文件夹
+                        File folder = null;
+                        try {
+                            folder = trailsHelper.getAppPath();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                        log2handler("文件夹："+folder.getAbsolutePath());
                     }else if(flag_btn=="login_igps"){
                         try {
+                            log2handler("正在登录IGPS...");
                             ui_string = trailsHelper.loginIGPS();
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
                     }else if(flag_btn=="upload_igps"){
                         try {
+                            log2handler("正在上传文件给iGPSPORT...");
                             trailsHelper.uploadGPXFiles();
                         } catch (Exception e) {
                             e.printStackTrace();
@@ -210,7 +246,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }).start();
             else{
 //                Toast.makeText(getApplicationContext(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
-                textView.setText(msg.obj.toString());
+                log2textview(msg.obj.toString());
             }
 //            textView.setText(info);
         }
@@ -220,12 +256,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private List<String> dataList;
     UtilPreferences preferences;
     EditText xoss_username, xoss_password, igps_username, igps_password;
+    ScrollView scroll_textView;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        scroll_textView = findViewById(R.id.scroll_textView);
         textView = findViewById(R.id.textview);
+        textView.setMovementMethod(new ScrollingMovementMethod()); // 启用滚动
 
         btn_xoss = findViewById(R.id.btn_xoss);
         btn_xoss.setOnClickListener(this);
@@ -243,15 +282,25 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         dataList.add("1.Support check XOSS");
         dataList.add("2.Support check IGPSPORT");
         dataList.add("2.Support XOSS --> IGPSPORT");
-//        for(int i=0;i<5;i++){
-//            dataList.add("Item "+i);
-//        }
+
         // 创建适配器
         adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, dataList);
 
         // 设置适配器
         listView.setAdapter(adapter);
-//        adapter.notifyDataSetChanged();
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            String selectedItem = (String) parent.getItemAtPosition(position);
+//            log2textview("点击了" + parent.getItemAtPosition(position));
+//            log2textview("点击了" + dataList.get(position));
+//            log2textview("点击了" + dataList.get((int) id));
+            String idstr = selectedItem.split("@")[0].split("#")[1];
+            Toast.makeText(this, "点击了：" + idstr, Toast.LENGTH_SHORT).show();
+            log2handler("选择GPX-ID="+idstr);
+//            Gson gson = new Gson();
+//            Type type = new TypeToken<Map<String, Object>>() {}.getType();
+//            Map<String, Object> parsedMap = gson.fromJson(selectedItem, type);
+//            System.out.println("处理ID：" + parsedMap.get("id"));
+        });
 
 
         // 使用示例
@@ -266,6 +315,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         getPermissions();
         preferences = new UtilPreferences(this);
+        gpxEleHelper = new GpxEleHelper(handler=handler);
+        trailsHelper = new TrailsHelper(getApplicationContext(), handler=handler);
+
         // 个人信息
         xoss_username = findViewById(R.id.xoss_username);
         xoss_password = findViewById(R.id.xoss_password);
@@ -275,8 +327,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         xoss_password.setText(preferences.getParam("xoss_password", "").toString());
         igps_username.setText(preferences.getParam("igps_username", "").toString());
         igps_password.setText(preferences.getParam("igps_password", "").toString());
-
-        trailsHelper = new TrailsHelper(getApplicationContext(), handler=handler);
     }
 
     @Override
@@ -344,14 +394,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             ActivityCompat.requestPermissions(this, permissions, 1);
         }
 
-//        if (ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET)
-//                != PackageManager.PERMISSION_GRANTED) {
-//            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.INTERNET}, 1);
-//        }
-//        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-//        Uri uri = Uri.fromParts("package", getPackageName(), null);
-//        intent.setData(uri);
-//        startActivity(intent);
     }
 
 }
