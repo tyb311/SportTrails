@@ -271,11 +271,15 @@ public class TrailsHelper {
         JsonObject element = null;
         for(int i=0;i< jsonArray.size();i++){
             element = jsonArray.get(i).getAsJsonObject();
-//            Message msg = handler.obtainMessage();
-//            msg.obj = "check-id:"+element.get("id").getAsString()+"-"+idStr;
-//            handler.sendMessage(msg);
             if(element.get("id").getAsString().contains(idStr))
                 break;  //==并不行，用contains才可以
+        }
+        if(!element.get("id").getAsString().contains(idStr)){
+            Message msg = handler.obtainMessage();
+            msg.obj = "未找到与之匹配的轨迹：:"+idStr;
+            handler.sendMessage(msg);
+            flag_running=false;
+            return false;
         }
         System.out.println("Downloading:"+element.toString());
         String RideId = element.get("id").getAsString();
@@ -456,7 +460,7 @@ public class TrailsHelper {
         try (FileOutputStream fos = new FileOutputStream(filename)) {
             fos.write(data);
             Message msg = handler.obtainMessage();
-            msg.obj = "文件下载成功:"+filename.getName();
+            msg.obj = "文件下载成功:"+filename.getName()+"@"+current_RideId;
             handler.sendMessage(msg);
         }
     }
@@ -595,12 +599,12 @@ public class TrailsHelper {
             File gpxDir = getAppPath();
 //            Log.i("OSS", gpxDir.getAbsolutePath());
 
-            File[] gpxFiles = gpxDir.listFiles();
-            Log.i("OSS", "Files="+gpxFiles.length);
-            String folderTree=gpxDir.getAbsolutePath();
-            for (File gpx : gpxDir.listFiles()) {
-                folderTree += "\n\t"+gpx.getName();
-            }
+//            File[] gpxFiles = gpxDir.listFiles();
+//            Log.i("OSS", "Files="+gpxFiles.length);
+//            String folderTree=gpxDir.getPath();
+//            for (File gpx : gpxDir.listFiles()) {
+//                folderTree += "\n\t"+gpx.getName();
+//            }
 
             String ossName = "1456042-" + UUID.randomUUID().toString();
             Log.i("OSS", gpxFile.getName());
@@ -618,7 +622,7 @@ public class TrailsHelper {
             Log.i("OSS", "上传至IGPS成功");
 
             msg = handler.obtainMessage();
-            msg.obj = "上传至IGPSPORTS成功:"+gpxFile.getName()+"\n"+folderTree;
+            msg.obj = "上传至IGPSPORTS成功:"+gpxFile.getName();
             handler.sendMessage(msg);
 //                /data/user/0/com.uestc.sporttrails/files/SportsTrails/185387836.gpx
             flag_running=false;

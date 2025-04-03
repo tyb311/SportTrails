@@ -136,7 +136,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 //                map.put("id", RideId);
 //                map.put("time", StartTime);
 //                dataList.add(gson.toJson(map));
-                dataList.add("iGPS"+"#"+RideId+"@"+StartTime);
+                dataList.add("iGPS#"+RideId+"&"+Title+"@"+StartTime);
             }
             log2textview("IGPSORTS@最新轨迹数量："+jsonArray.size());
         }else if(jsonObject.has("data")){
@@ -182,7 +182,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     jsonStr2ListView(ui_string);
                     ui_string="";
                 }
-            }else if(flag_btn.startsWith("download_xoss")){
+            }else if(flag_btn.startsWith("xoss2igps")){
                 try {
 //                    log2handler("正在登录XOSS...");
 //                    ui_string = trailsHelper.loginXOSS();
@@ -191,7 +191,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     new Thread(new Runnable() {
                         @Override
                         public void run() {
-                            String idstr = flag_btn.split("_")[2];
+                            log2handler("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+                            Log.e("FLAG-GTN", flag_btn);
+                            String idstr = flag_btn.split("_")[1];
                             log2handler("正在下载最新GPX@ID="+idstr);
                             boolean flag_download = trailsHelper.download_gpxfile_byid(idstr);
                             try {
@@ -224,26 +226,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             log2handler("正在登录XOSS...");
                             ui_string = trailsHelper.loginXOSS();
 
-//                            // downloadGpxFromXoss
-//                            new Thread(new Runnable() {
-//                                @Override
-//                                public void run() {
-//                                    log2handler("正在下载最新GPX...");
-//                                    boolean flag_download = trailsHelper.download_latest_gpxfile();
-////                                    log2handler("下载最新GPX完成！");
-//                                    File gpxFile = null;
-//                                    try {
-//                                        gpxFile = new File(trailsHelper.getAppPath(), trailsHelper.gpx_name);
-//                                    } catch (IOException e) {
-//                                        e.printStackTrace();
-//                                    }
-//                                    if(flag_download && gpxFile.exists()){
-//                                        Log.i("ELE", gpxFile.getAbsolutePath());
-//                                        log2handler("正在生成海拔数据...");
-//                                        gpxEleHelper.processGpxFile(gpxFile);
-//                                    }
-//                                }
-//                            }).start();
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -263,13 +245,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
-//                    }else if(flag_btn=="upload_igps"){
-//                        try {
-//                            log2handler("正在上传文件给iGPSPORT...");
-//                            trailsHelper.uploadGPXFiles();
-//                        } catch (Exception e) {
-//                            e.printStackTrace();
-//                        }
                     }
 
                     flag_btn = "";
@@ -331,7 +306,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 //            Type type = new TypeToken<Map<String, Object>>() {}.getType();
 //            Map<String, Object> parsedMap = gson.fromJson(selectedItem, type);
 //            System.out.println("处理ID：" + parsedMap.get("id"));
-            if(selectedItem.contains("XOSS")){
+            if(selectedItem.startsWith("XOSS")){
                 if(trailsHelper.flag_running)
                     Toast.makeText(this, "正在下载轨迹，请稍后!", Toast.LENGTH_SHORT).show();
                 else if(gpxEleHelper.flag_running)
@@ -341,7 +316,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     Toast.makeText(this, "点击了：" + idstr, Toast.LENGTH_SHORT).show();
                     log2handler("选择"+selectedItem);
                     Message msg = handler.obtainMessage();
-                    msg.obj = "download_xoss_"+idstr;
+                    msg.obj = "xoss2igps_"+idstr;
                     handler.sendMessage(msg);
                 }
             }else
@@ -393,9 +368,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             handler.sendMessage(msg);
         }
         else if(v.getId()==R.id.btn_upload){
-            Message msg = handler.obtainMessage();
-            msg.obj = "upload_igps";
-            handler.sendMessage(msg);
+            if(dataList.get(0).startsWith("XOSS")){
+                String idstr = dataList.get(0).split("@")[0].split("#")[1];
+                Message msg = handler.obtainMessage();
+                msg.obj = "xoss2igps_"+idstr;
+                handler.sendMessage(msg);
+            }
         }
     }
 

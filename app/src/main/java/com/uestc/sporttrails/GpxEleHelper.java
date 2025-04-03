@@ -72,8 +72,9 @@ public class GpxEleHelper {
                 long elapsedTime = (endTime - startTime)/1000; // 计算运行时间（秒）
                 Log.d("RunTime", "程序运行时间：" + elapsedTime + " 秒");
 
+                File gpxSave = new File(TrailsHelper.getAppPath(), TrailsHelper.current_RideId+".gpx");
                 Message msg = handler.obtainMessage();
-                msg.obj = "添加ELE成功@耗时"+elapsedTime+"秒@"+gpxFile.getName();
+                msg.obj = "添加ELE成功@耗时"+elapsedTime+"秒@"+gpxSave.getName();
                 handler.sendMessage(msg);
 
                 flag_running=false;
