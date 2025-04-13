@@ -36,7 +36,7 @@ import okhttp3.Response;
 
 public class GpxEleHelper {
     public boolean flag_running=false;
-    public static int fetch_stride = 50;
+    public static int fetch_stride = 25;
     private static final String TAG = "GpxElevationProcessor";
 
     public static Handler handler;
